@@ -353,6 +353,7 @@
         <h3>Ta photo</h3>
         <div class="photo-zone" id="photo-zone">Clique pour ajouter ta photo</div>
         <input type="file" accept="image/*" id="photo-input" style="display:none">
+        <div style="font-family:'Inter',sans-serif; font-size:0.72rem; color:#8C8880; margin-top:0.6rem;">Pour un meilleur rendu : photo en pied ou demi-corps, de face, format portrait, fond simple, vêtements unis en dessous.</div>
       </div>
       <div class="panel">
         <h3>Choisis un vêtement</h3>
@@ -361,6 +362,14 @@
     </div>
 
     <div class="run-zone">
+      <div style="display:flex; justify-content:center; flex-wrap:wrap; gap:1.5rem; margin-bottom:1rem; font-family:'Inter',sans-serif; font-size:0.82rem; color:#C9C5B9;">
+        <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+          <input type="checkbox" id="opt-automask" checked> Masque automatique
+        </label>
+        <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+          <input type="checkbox" id="opt-autocrop" checked> Recadrage automatique
+        </label>
+      </div>
       <button class="run-btn" id="run-btn" disabled>Lancer l'essayage</button>
       <div class="tape" id="tape"><div class="tape-fill"></div></div>
       <div class="status-msg" id="status-msg"></div>
@@ -387,6 +396,9 @@
       <label>Photo</label>
       <div class="upload-zone" id="item-upload-zone">Clique pour choisir une photo</div>
       <input type="file" accept="image/*" id="item-photo-input" style="display:none">
+      <label>Description détaillée (optionnel)</label>
+      <input type="text" id="item-desc" placeholder="Ex : chemise en flanelle à carreaux rouge et noir, manches longues">
+      <div style="font-family:'Inter',sans-serif; font-size:0.72rem; color:#8C8880; margin-top:0.4rem;">Une description précise (matière, couleur, coupe) donne un essayage plus fidèle qu'un simple nom.</div>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="modal-cancel">Annuler</button>
         <button class="btn btn-primary" id="modal-save" disabled>Ajouter</button>
@@ -555,6 +567,7 @@
     document.getElementById('modal-overlay').classList.remove('hidden');
     document.getElementById('item-name').value = '';
     document.getElementById('item-cat').value = 'Hauts';
+    document.getElementById('item-desc').value = '';
     pendingItemPhoto = null;
     document.getElementById('item-upload-zone').innerHTML = 'Clique pour choisir une photo';
     document.getElementById('modal-save').disabled = true;
@@ -588,7 +601,8 @@
   document.getElementById('modal-save').onclick = async () => {
     const name = document.getElementById('item-name').value.trim();
     const category = document.getElementById('item-cat').value;
-    wardrobe.push({ id: 'item-' + Date.now(), name, category, image: pendingItemPhoto });
+    const description = document.getElementById('item-desc').value.trim();
+    wardrobe.push({ id: 'item-' + Date.now(), name, category, image: pendingItemPhoto, description: description });
     await saveWardrobe();
     renderWardrobe();
     renderMiniGrid();
@@ -646,7 +660,9 @@
         body: JSON.stringify({
           personImage: userPhoto,
           garmentImage: item.image,
-          description: item.name
+          description: (item.description && item.description.trim()) ? item.description.trim() : item.name,
+          autoMask: document.getElementById('opt-automask').checked,
+          autoCrop: document.getElementById('opt-autocrop').checked
         })
       });
       const payload = await res.json().catch(() => ({}));
