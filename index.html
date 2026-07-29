@@ -73,6 +73,14 @@
   .view { padding: 1.5rem 1.25rem; max-width: 900px; margin: 0 auto; }
   .view.hidden { display: none; }
 
+  .sync-banner {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.78rem;
+    color: #9D9A8F;
+    margin-bottom: 1.1rem;
+  }
+  .sync-banner.error { color: #E0A87A; }
+
   .chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem; }
   .chip {
     font-family: 'Inter', sans-serif;
@@ -334,6 +342,7 @@
   </div>
 
   <div class="view" id="view-wardrobe">
+    <div class="sync-banner" id="sync-banner"></div>
     <div class="chips" id="chips"></div>
     <div class="grid" id="wardrobe-grid"></div>
   </div>
@@ -344,9 +353,6 @@
         <h3>Ta photo</h3>
         <div class="photo-zone" id="photo-zone">Clique pour ajouter ta photo</div>
         <input type="file" accept="image/*" id="photo-input" style="display:none">
-        <label style="display:block; font-family:'Inter',sans-serif; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em; color:#9D9A8F; margin:1rem 0 0.35rem;">Clé Hugging Face (recommandé)</label>
-        <input type="text" id="hf-token" placeholder="hf_..." style="width:100%; background:#17161A; border:1px solid #3A3842; color:#EDE8DC; padding:0.5rem 0.65rem; border-radius:6px; font-family:'Inter',sans-serif; font-size:0.82rem;">
-        <div style="font-family:'Inter',sans-serif; font-size:0.72rem; color:#8C8880; margin-top:0.4rem;">Sans clé, le quota GPU gratuit est très limité et échoue souvent. Génère un jeton gratuit sur huggingface.co (Settings → Access Tokens), stocké seulement sur cet appareil.</div>
       </div>
       <div class="panel">
         <h3>Choisis un vêtement</h3>
@@ -391,12 +397,20 @@
 
 <script>
 (function() {
+  const API_BASE = "https://garderobe-api.vercel.app/api/wardrobe";
+
   const CATS = ["Hauts", "Bas", "Vestes", "Chaussures", "Accessoires"];
   let wardrobe = [];
   let userPhoto = null;
   let currentFilter = "Tous";
   let selectedItemId = null;
   let pendingItemPhoto = null;
+
+  function setSyncStatus(msg, isError) {
+    const el = document.getElementById('sync-banner');
+    el.className = 'sync-banner' + (isError ? ' error' : '');
+    el.textContent = msg;
+  }
 
   function resizeImage(dataUrl, maxDim) {
     return new Promise(resolve => {
@@ -424,28 +438,51 @@
   }
 
   async function loadWardrobe() {
+    if (API_BASE.indexOf('COLLE_ICI') === 0) {
+      setSyncStatus("L'adresse de l'API n'est pas encore configurée dans le code.", true);
+      wardrobe = [];
+      renderWardrobe();
+      renderMiniGrid();
+      updateRunButton();
+      return;
+    }
     try {
-      const raw = localStorage.getItem('wardrobe-items');
-      wardrobe = raw ? JSON.parse(raw) : [];
-    } catch (e) { wardrobe = []; }
-    try {
-      userPhoto = localStorage.getItem('user-photo');
-    } catch (e) { userPhoto = null; }
+      const res = await fetch(API_BASE + '/api/wardrobe');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || ('Erreur API (' + res.status + ')'));
+      }
+      const data = await res.json();
+      wardrobe = data.items || [];
+      userPhoto = data.userPhoto || null;
+      setSyncStatus('Synchronisé.');
+    } catch (e) {
+      wardrobe = [];
+      setSyncStatus('Synchronisation impossible : ' + e.message, true);
+    }
     renderWardrobe();
     renderMiniGrid();
     if (userPhoto) {
       document.getElementById('photo-zone').innerHTML = '<img src="' + userPhoto + '">';
     }
-    try {
-      const savedToken = localStorage.getItem('hf-token');
-      if (savedToken) document.getElementById('hf-token').value = savedToken;
-    } catch (e) {}
     updateRunButton();
   }
 
   async function saveWardrobe() {
-    try { localStorage.setItem('wardrobe-items', JSON.stringify(wardrobe)); }
-    catch (e) { console.error('storage error', e); }
+    try {
+      const res = await fetch(API_BASE + '/api/wardrobe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: wardrobe, userPhoto: userPhoto })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || ('Erreur API (' + res.status + ')'));
+      }
+      setSyncStatus('Synchronisé.');
+    } catch (e) {
+      setSyncStatus('Échec de sauvegarde : ' + e.message, true);
+    }
   }
 
   function renderChips() {
@@ -567,7 +604,7 @@
     const raw = await readFileAsDataUrl(file);
     userPhoto = await resizeImage(raw, 900);
     document.getElementById('photo-zone').innerHTML = '<img src="' + userPhoto + '">';
-    try { localStorage.setItem('user-photo', userPhoto); } catch (e) {}
+    await saveWardrobe();
     updateRunButton();
   };
 
@@ -581,10 +618,6 @@
     };
   });
 
-  function dataUrlToBlob(dataUrl) {
-    return fetch(dataUrl).then(r => r.blob());
-  }
-
   document.getElementById('run-btn').onclick = async () => {
     const statusEl = document.getElementById('status-msg');
     const tape = document.getElementById('tape');
@@ -594,67 +627,38 @@
     const item = wardrobe.find(i => i.id === selectedItemId);
     if (!userPhoto || !item) return;
 
+    if (API_BASE.indexOf('COLLE_ICI') === 0) {
+      statusEl.className = 'status-msg error';
+      statusEl.textContent = "L'adresse de l'API n'est pas encore configurée dans le code.";
+      return;
+    }
+
     runBtn.disabled = true;
     tape.classList.add('active');
     resultBox.classList.add('hidden');
     statusEl.className = 'status-msg';
-    statusEl.textContent = "Connexion au Space Hugging Face (IDM-VTON)... ça peut prendre une minute ou deux selon l'affluence.";
+    statusEl.textContent = "Génération en cours... ça peut prendre une minute ou deux selon l'affluence.";
 
     try {
-      const hfToken = document.getElementById('hf-token').value.trim();
-      if (hfToken) {
-        try { localStorage.setItem('hf-token', hfToken); } catch (e) {}
+      const res = await fetch(API_BASE + '/api/tryon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          personImage: userPhoto,
+          garmentImage: item.image,
+          description: item.name
+        })
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok || !payload.url) {
+        throw new Error(payload.error || ('Erreur API (' + res.status + ')'));
       }
-      const { Client } = await import("https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js");
-      const personBlob = await dataUrlToBlob(userPhoto);
-      const garmentBlob = await dataUrlToBlob(item.image);
-
-      const tryonInputs = [
-        { background: personBlob, layers: [personBlob], composite: personBlob },
-        garmentBlob,
-        item.name,
-        true,
-        true,
-        30,
-        Math.floor(Math.random() * 100000)
-      ];
-
-      let result;
-      let usedHost = "yisol/IDM-VTON";
-      try {
-        const app = await Client.connect(usedHost, hfToken ? { token: hfToken } : undefined);
-        result = await app.predict("/tryon", tryonInputs);
-      } catch (firstErr) {
-        statusEl.textContent = "yisol/IDM-VTON indisponible, nouvelle tentative sur une copie du modèle...";
-        usedHost = "selfit-camera/IDM-VTON-PLUS";
-        const app2 = await Client.connect(usedHost, hfToken ? { token: hfToken } : undefined);
-        result = await app2.predict("/tryon", tryonInputs);
-      }
-
-      let outUrl = null;
-      const data = result && result.data;
-      if (Array.isArray(data) && data[0]) {
-        let first = data[0];
-        if (Array.isArray(first) && first[0]) first = first[0];
-        if (first && first.image) first = first.image;
-        if (typeof first === 'string') outUrl = first;
-        else if (first && first.url) outUrl = first.url;
-        else if (first && first.path) outUrl = first.path;
-      }
-
-      if (outUrl) {
-        document.getElementById('result-img').src = outUrl;
-        resultBox.classList.remove('hidden');
-        statusEl.textContent = "Essayage généré.";
-      } else {
-        throw new Error("Format de réponse inattendu du Space.");
-      }
+      document.getElementById('result-img').src = payload.url;
+      resultBox.classList.remove('hidden');
+      statusEl.textContent = "Essayage généré.";
     } catch (err) {
       statusEl.className = 'status-msg error';
-      let detail = '';
-      try { detail = JSON.stringify(err, Object.getOwnPropertyNames(err)); } catch (e) {}
-      const shown = (err && err.message ? err.message : String(err)) + (detail && detail !== '{}' ? ' — ' + detail : '');
-      statusEl.innerHTML = "Ça n'a pas fonctionné depuis le site (" + escapeHtml(shown) + "). Les deux copies du Space ont échoué. Tu peux essayer directement en ligne : <a class='fallback-link' href='https://huggingface.co/spaces/yisol/IDM-VTON' target='_blank'>IDM-VTON</a> ou <a class='fallback-link' href='https://huggingface.co/spaces/selfit-camera/IDM-VTON-PLUS' target='_blank'>IDM-VTON-PLUS</a>";
+      statusEl.innerHTML = "Ça n'a pas fonctionné (" + escapeHtml(err.message || String(err)) + "). Tu peux essayer directement en ligne : <a class='fallback-link' href='https://huggingface.co/spaces/yisol/IDM-VTON' target='_blank'>IDM-VTON</a> ou <a class='fallback-link' href='https://huggingface.co/spaces/selfit-camera/IDM-VTON-PLUS' target='_blank'>IDM-VTON-PLUS</a>";
     } finally {
       tape.classList.remove('active');
       runBtn.disabled = false;
