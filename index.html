@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ma garde-robe</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .app {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: #17161A;
+    color: #EDE8DC;
+    min-height: 100vh;
+    padding: 0 0 4rem;
+  }
+  .app h1, .app h2, .app h3 { font-family: 'Fraunces', Georgia, serif; }
+
+  .topbar {
+    padding: 1.5rem 1.25rem 1rem;
+    border-bottom: 1px solid #33313A;
+    position: sticky;
+    top: 0;
+    background: #17161A;
+    z-index: 10;
+  }
+  .topbar h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0 0 0.9rem;
+    letter-spacing: 0.01em;
+  }
+  .topbar h1 .tag {
+    display: inline-block;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #17161A;
+    background: #B08D57;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-left: 0.6rem;
+  }
+  .tabs {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .tab-btn {
+    font-family: 'Inter', sans-serif;
+    background: transparent;
+    border: 1px solid #3A3842;
+    color: #A9A59A;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .tab-btn.active {
+    background: #EDE8DC;
+    color: #17161A;
+    border-color: #EDE8DC;
+    font-weight: 600;
+  }
+  .tab-btn:hover:not(.active) {
+    border-color: #5C7A6E;
+    color: #EDE8DC;
+  }
+
+  .view { padding: 1.5rem 1.25rem; max-width: 900px; margin: 0 auto; }
+  .view.hidden { display: none; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem; }
+  .chip {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    background: #211F26;
+    border: 1px solid #33313A;
+    color: #C9C5B9;
+    padding: 0.4rem 0.85rem;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .chip.active { background: #5C7A6E; border-color: #5C7A6E; color: #0E1210; font-weight: 600; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 1rem;
+  }
+
+  .tag-card {
+    position: relative;
+    background: #221F1A;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.15s ease, transform 0.1s ease;
+  }
+  .tag-card:hover { transform: translateY(-2px); }
+  .tag-card.selected { border-color: #B08D57; }
+  .tag-card::before {
+    content: '';
+    position: absolute;
+    top: 8px; right: 8px;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: #17161A;
+    z-index: 2;
+    box-shadow: inset 0 0 0 1px #4A4740;
+  }
+  .tag-card img { width: 100%; height: 150px; object-fit: cover; display: block; background: #2B2822; }
+  .tag-card .label {
+    font-family: 'Inter', sans-serif;
+    padding: 0.5rem 0.6rem 0.65rem;
+    font-size: 0.8rem;
+  }
+  .tag-card .label .name { font-weight: 600; display: block; }
+  .tag-card .label .cat { color: #9D9A8F; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .tag-card .del {
+    position: absolute; top: 6px; left: 6px;
+    width: 22px; height: 22px;
+    background: rgba(20,18,15,0.75);
+    border: none; border-radius: 50%;
+    color: #EDE8DC; font-size: 0.85rem;
+    display: none; align-items: center; justify-content: center;
+    cursor: pointer; z-index: 3;
+  }
+  .tag-card:hover .del { display: flex; }
+
+  .add-card {
+    background: transparent;
+    border: 1.5px dashed #4A4740;
+    border-radius: 6px;
+    min-height: 200px;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+    color: #9D9A8F;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    gap: 0.4rem;
+  }
+  .add-card:hover { border-color: #B08D57; color: #EDE8DC; }
+  .add-card .plus { font-size: 1.8rem; font-family: 'Fraunces', serif; line-height: 1; }
+
+  .empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #8C8880;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(10,9,7,0.75);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+    padding: 1rem;
+  }
+  .modal-overlay.hidden { display: none; }
+  .modal {
+    background: #211F26;
+    border-radius: 10px;
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 380px;
+    border: 1px solid #33313A;
+  }
+  .modal h3 { margin: 0 0 1rem; font-size: 1.1rem; }
+  .modal label {
+    display: block;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #9D9A8F;
+    margin: 0.9rem 0 0.35rem;
+  }
+  .modal input[type=text], .modal select {
+    width: 100%;
+    background: #17161A;
+    border: 1px solid #3A3842;
+    color: #EDE8DC;
+    padding: 0.55rem 0.7rem;
+    border-radius: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+  }
+  .modal .upload-zone {
+    margin-top: 0.9rem;
+    border: 1.5px dashed #3A3842;
+    border-radius: 6px;
+    padding: 1rem;
+    text-align: center;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.82rem;
+    color: #9D9A8F;
+  }
+  .modal .upload-zone img { max-width: 100%; max-height: 140px; border-radius: 4px; display: block; margin: 0 auto; }
+  .modal-actions { display: flex; gap: 0.6rem; margin-top: 1.4rem; }
+  .btn {
+    font-family: 'Inter', sans-serif;
+    border: none;
+    border-radius: 6px;
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    flex: 1;
+  }
+  .btn-primary { background: #B08D57; color: #17161A; }
+  .btn-primary:disabled { background: #4A4740; color: #8C8880; cursor: not-allowed; }
+  .btn-ghost { background: transparent; border: 1px solid #3A3842; color: #C9C5B9; }
+
+  .essayage-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  @media (min-width: 640px) {
+    .essayage-grid { grid-template-columns: 1fr 1fr; }
+  }
+  .panel {
+    background: #211F26;
+    border: 1px solid #33313A;
+    border-radius: 10px;
+    padding: 1.1rem;
+  }
+  .panel h3 { font-size: 0.95rem; margin: 0 0 0.8rem; font-family: 'Inter', sans-serif; font-weight: 600; }
+  .photo-zone {
+    border: 1.5px dashed #3A3842;
+    border-radius: 8px;
+    min-height: 220px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: #9D9A8F;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    overflow: hidden;
+  }
+  .photo-zone img { width: 100%; height: 100%; object-fit: cover; }
+
+  .mini-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 0.6rem;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+  .mini-card {
+    border: 2px solid transparent;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .mini-card.selected { border-color: #B08D57; }
+  .mini-card img { width: 100%; height: 90px; object-fit: cover; display: block; }
+
+  .run-zone { text-align: center; margin: 1.5rem 0; }
+  .run-btn {
+    font-family: 'Inter', sans-serif;
+    background: #5C7A6E;
+    color: #0E1210;
+    border: none;
+    border-radius: 999px;
+    padding: 0.8rem 2rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .run-btn:disabled { background: #3A3842; color: #71706A; cursor: not-allowed; }
+
+  .tape {
+    width: 100%;
+    height: 6px;
+    background: #2B2822;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 1rem;
+    display: none;
+  }
+  .tape.active { display: block; }
+  .tape-fill {
+    height: 100%;
+    width: 30%;
+    background: #B08D57;
+    animation: tape-move 1.4s ease-in-out infinite;
+  }
+  @keyframes tape-move {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(330%); }
+  }
+
+  .result-box {
+    margin-top: 1.5rem;
+    text-align: center;
+  }
+  .result-box img { max-width: 100%; border-radius: 8px; border: 1px solid #33313A; }
+  .status-msg {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    color: #9D9A8F;
+    margin-top: 0.8rem;
+  }
+  .status-msg.error { color: #E0A87A; }
+  .fallback-link {
+    display: inline-block;
+    margin-top: 0.6rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.82rem;
+    color: #B08D57;
+    text-decoration: underline;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <div class="topbar">
+    <h1>Ma garde-robe<span class="tag">Beta</span></h1>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="wardrobe">Garde-robe</button>
+      <button class="tab-btn" data-tab="tryon">Essayage</button>
+    </div>
+  </div>
+
+  <div class="view" id="view-wardrobe">
+    <div class="chips" id="chips"></div>
+    <div class="grid" id="wardrobe-grid"></div>
+  </div>
+
+  <div class="view hidden" id="view-tryon">
+    <div class="essayage-grid">
+      <div class="panel">
+        <h3>Ta photo</h3>
+        <div class="photo-zone" id="photo-zone">Clique pour ajouter ta photo</div>
+        <input type="file" accept="image/*" id="photo-input" style="display:none">
+        <label style="display:block; font-family:'Inter',sans-serif; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em; color:#9D9A8F; margin:1rem 0 0.35rem;">Clé Hugging Face (recommandé)</label>
+        <input type="text" id="hf-token" placeholder="hf_..." style="width:100%; background:#17161A; border:1px solid #3A3842; color:#EDE8DC; padding:0.5rem 0.65rem; border-radius:6px; font-family:'Inter',sans-serif; font-size:0.82rem;">
+        <div style="font-family:'Inter',sans-serif; font-size:0.72rem; color:#8C8880; margin-top:0.4rem;">Sans clé, le quota GPU gratuit est très limité et échoue souvent. Génère un jeton gratuit sur huggingface.co (Settings → Access Tokens), stocké seulement sur cet appareil.</div>
+      </div>
+      <div class="panel">
+        <h3>Choisis un vêtement</h3>
+        <div class="mini-grid" id="mini-grid"></div>
+      </div>
+    </div>
+
+    <div class="run-zone">
+      <button class="run-btn" id="run-btn" disabled>Lancer l'essayage</button>
+      <div class="tape" id="tape"><div class="tape-fill"></div></div>
+      <div class="status-msg" id="status-msg"></div>
+    </div>
+
+    <div class="result-box hidden" id="result-box">
+      <img id="result-img">
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="modal-overlay">
+    <div class="modal">
+      <h3>Ajouter un vêtement</h3>
+      <label>Nom</label>
+      <input type="text" id="item-name" placeholder="Ex : Chemise à carreaux">
+      <label>Catégorie</label>
+      <select id="item-cat">
+        <option value="Hauts">Hauts</option>
+        <option value="Bas">Bas</option>
+        <option value="Vestes">Vestes</option>
+        <option value="Chaussures">Chaussures</option>
+        <option value="Accessoires">Accessoires</option>
+      </select>
+      <label>Photo</label>
+      <div class="upload-zone" id="item-upload-zone">Clique pour choisir une photo</div>
+      <input type="file" accept="image/*" id="item-photo-input" style="display:none">
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="modal-cancel">Annuler</button>
+        <button class="btn btn-primary" id="modal-save" disabled>Ajouter</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const CATS = ["Hauts", "Bas", "Vestes", "Chaussures", "Accessoires"];
+  let wardrobe = [];
+  let userPhoto = null;
+  let currentFilter = "Tous";
+  let selectedItemId = null;
+  let pendingItemPhoto = null;
+
+  function resizeImage(dataUrl, maxDim) {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > h && w > maxDim) { h = h * (maxDim / w); w = maxDim; }
+        else if (h > maxDim) { w = w * (maxDim / h); h = maxDim; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.src = dataUrl;
+    });
+  }
+
+  function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+  }
+
+  async function loadWardrobe() {
+    try {
+      const raw = localStorage.getItem('wardrobe-items');
+      wardrobe = raw ? JSON.parse(raw) : [];
+    } catch (e) { wardrobe = []; }
+    try {
+      userPhoto = localStorage.getItem('user-photo');
+    } catch (e) { userPhoto = null; }
+    renderWardrobe();
+    renderMiniGrid();
+    if (userPhoto) {
+      document.getElementById('photo-zone').innerHTML = '<img src="' + userPhoto + '">';
+    }
+    try {
+      const savedToken = localStorage.getItem('hf-token');
+      if (savedToken) document.getElementById('hf-token').value = savedToken;
+    } catch (e) {}
+    updateRunButton();
+  }
+
+  async function saveWardrobe() {
+    try { localStorage.setItem('wardrobe-items', JSON.stringify(wardrobe)); }
+    catch (e) { console.error('storage error', e); }
+  }
+
+  function renderChips() {
+    const chips = document.getElementById('chips');
+    chips.innerHTML = '';
+    ['Tous', ...CATS].forEach(cat => {
+      const el = document.createElement('div');
+      el.className = 'chip' + (cat === currentFilter ? ' active' : '');
+      el.textContent = cat;
+      el.onclick = () => { currentFilter = cat; renderWardrobe(); };
+      chips.appendChild(el);
+    });
+  }
+
+  function renderWardrobe() {
+    renderChips();
+    const grid = document.getElementById('wardrobe-grid');
+    grid.innerHTML = '';
+    const addCard = document.createElement('div');
+    addCard.className = 'add-card';
+    addCard.innerHTML = '<div class="plus">+</div><div>Ajouter un vêtement</div>';
+    addCard.onclick = openModal;
+    grid.appendChild(addCard);
+
+    const items = currentFilter === 'Tous' ? wardrobe : wardrobe.filter(i => i.category === currentFilter);
+    items.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'tag-card';
+      card.innerHTML = '<button class="del">×</button><img src="' + item.image + '"><div class="label"><span class="name">' + escapeHtml(item.name) + '</span><span class="cat">' + item.category + '</span></div>';
+      card.querySelector('.del').onclick = (e) => {
+        e.stopPropagation();
+        if (confirm('Supprimer "' + item.name + '" ?')) {
+          wardrobe = wardrobe.filter(i => i.id !== item.id);
+          saveWardrobe();
+          renderWardrobe();
+          renderMiniGrid();
+        }
+      };
+      grid.appendChild(card);
+    });
+  }
+
+  function renderMiniGrid() {
+    const mg = document.getElementById('mini-grid');
+    mg.innerHTML = '';
+    if (wardrobe.length === 0) {
+      mg.innerHTML = '<div class="status-msg">Ajoute d&#39;abord des vêtements dans l&#39;onglet Garde-robe.</div>';
+      return;
+    }
+    wardrobe.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'mini-card' + (item.id === selectedItemId ? ' selected' : '');
+      card.innerHTML = '<img src="' + item.image + '">';
+      card.onclick = () => { selectedItemId = item.id; renderMiniGrid(); updateRunButton(); };
+      mg.appendChild(card);
+    });
+  }
+
+  function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function updateRunButton() {
+    document.getElementById('run-btn').disabled = !(userPhoto && selectedItemId);
+  }
+
+  function openModal() {
+    document.getElementById('modal-overlay').classList.remove('hidden');
+    document.getElementById('item-name').value = '';
+    document.getElementById('item-cat').value = 'Hauts';
+    pendingItemPhoto = null;
+    document.getElementById('item-upload-zone').innerHTML = 'Clique pour choisir une photo';
+    document.getElementById('modal-save').disabled = true;
+  }
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.add('hidden');
+  }
+
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('modal-overlay').onclick = (e) => {
+    if (e.target.id === 'modal-overlay') closeModal();
+  };
+
+  document.getElementById('item-upload-zone').onclick = () => {
+    document.getElementById('item-photo-input').click();
+  };
+  document.getElementById('item-photo-input').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const raw = await readFileAsDataUrl(file);
+    pendingItemPhoto = await resizeImage(raw, 700);
+    document.getElementById('item-upload-zone').innerHTML = '<img src="' + pendingItemPhoto + '">';
+    checkModalReady();
+  };
+  document.getElementById('item-name').oninput = checkModalReady;
+  function checkModalReady() {
+    const name = document.getElementById('item-name').value.trim();
+    document.getElementById('modal-save').disabled = !(name && pendingItemPhoto);
+  }
+
+  document.getElementById('modal-save').onclick = async () => {
+    const name = document.getElementById('item-name').value.trim();
+    const category = document.getElementById('item-cat').value;
+    wardrobe.push({ id: 'item-' + Date.now(), name, category, image: pendingItemPhoto });
+    await saveWardrobe();
+    renderWardrobe();
+    renderMiniGrid();
+    closeModal();
+  };
+
+  document.getElementById('photo-zone').onclick = () => {
+    document.getElementById('photo-input').click();
+  };
+  document.getElementById('photo-input').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const raw = await readFileAsDataUrl(file);
+    userPhoto = await resizeImage(raw, 900);
+    document.getElementById('photo-zone').innerHTML = '<img src="' + userPhoto + '">';
+    try { localStorage.setItem('user-photo', userPhoto); } catch (e) {}
+    updateRunButton();
+  };
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.dataset.tab;
+      document.getElementById('view-wardrobe').classList.toggle('hidden', tab !== 'wardrobe');
+      document.getElementById('view-tryon').classList.toggle('hidden', tab !== 'tryon');
+    };
+  });
+
+  function dataUrlToBlob(dataUrl) {
+    return fetch(dataUrl).then(r => r.blob());
+  }
+
+  document.getElementById('run-btn').onclick = async () => {
+    const statusEl = document.getElementById('status-msg');
+    const tape = document.getElementById('tape');
+    const resultBox = document.getElementById('result-box');
+    const runBtn = document.getElementById('run-btn');
+
+    const item = wardrobe.find(i => i.id === selectedItemId);
+    if (!userPhoto || !item) return;
+
+    runBtn.disabled = true;
+    tape.classList.add('active');
+    resultBox.classList.add('hidden');
+    statusEl.className = 'status-msg';
+    statusEl.textContent = "Connexion au Space Hugging Face (IDM-VTON)... ça peut prendre une minute ou deux selon l'affluence.";
+
+    try {
+      const hfToken = document.getElementById('hf-token').value.trim();
+      if (hfToken) {
+        try { localStorage.setItem('hf-token', hfToken); } catch (e) {}
+      }
+      const { Client } = await import("https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js");
+      const personBlob = await dataUrlToBlob(userPhoto);
+      const garmentBlob = await dataUrlToBlob(item.image);
+
+      const tryonInputs = [
+        { background: personBlob, layers: [personBlob], composite: personBlob },
+        garmentBlob,
+        item.name,
+        true,
+        true,
+        30,
+        Math.floor(Math.random() * 100000)
+      ];
+
+      let result;
+      let usedHost = "yisol/IDM-VTON";
+      try {
+        const app = await Client.connect(usedHost, hfToken ? { token: hfToken } : undefined);
+        result = await app.predict("/tryon", tryonInputs);
+      } catch (firstErr) {
+        statusEl.textContent = "yisol/IDM-VTON indisponible, nouvelle tentative sur une copie du modèle...";
+        usedHost = "selfit-camera/IDM-VTON-PLUS";
+        const app2 = await Client.connect(usedHost, hfToken ? { token: hfToken } : undefined);
+        result = await app2.predict("/tryon", tryonInputs);
+      }
+
+      let outUrl = null;
+      const data = result && result.data;
+      if (Array.isArray(data) && data[0]) {
+        let first = data[0];
+        if (Array.isArray(first) && first[0]) first = first[0];
+        if (first && first.image) first = first.image;
+        if (typeof first === 'string') outUrl = first;
+        else if (first && first.url) outUrl = first.url;
+        else if (first && first.path) outUrl = first.path;
+      }
+
+      if (outUrl) {
+        document.getElementById('result-img').src = outUrl;
+        resultBox.classList.remove('hidden');
+        statusEl.textContent = "Essayage généré.";
+      } else {
+        throw new Error("Format de réponse inattendu du Space.");
+      }
+    } catch (err) {
+      statusEl.className = 'status-msg error';
+      let detail = '';
+      try { detail = JSON.stringify(err, Object.getOwnPropertyNames(err)); } catch (e) {}
+      const shown = (err && err.message ? err.message : String(err)) + (detail && detail !== '{}' ? ' — ' + detail : '');
+      statusEl.innerHTML = "Ça n'a pas fonctionné depuis le site (" + escapeHtml(shown) + "). Les deux copies du Space ont échoué. Tu peux essayer directement en ligne : <a class='fallback-link' href='https://huggingface.co/spaces/yisol/IDM-VTON' target='_blank'>IDM-VTON</a> ou <a class='fallback-link' href='https://huggingface.co/spaces/selfit-camera/IDM-VTON-PLUS' target='_blank'>IDM-VTON-PLUS</a>";
+    } finally {
+      tape.classList.remove('active');
+      runBtn.disabled = false;
+    }
+  };
+
+  loadWardrobe();
+})();
+</script>
+</body>
+</html>
